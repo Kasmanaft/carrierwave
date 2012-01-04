@@ -108,9 +108,9 @@ module CarrierWave
         #
         def url
           if @uploader.s3_cnamed
-            ["http://#{@uploader.s3_bucket}", @path].compact.join('/')
+            ["https://#{@uploader.s3_bucket}", @path].compact.join('/')
           else
-            ["http://#{@uploader.s3_bucket}.s3.amazonaws.com", @path].compact.join('/')
+            ["https://#{@uploader.s3_bucket}.s3.amazonaws.com", @path].compact.join('/')
           end
         end
 
