@@ -26,21 +26,63 @@ module CarrierWave
         # === Parameters
         #
         # [name (#to_sym)] name of the version
+        # [options (Hash)] optional options hash
         # [&block (Proc)] a block to eval on this version of the uploader
         #
-        def version(name, &block)
+        # === Examples
+        #
+        #     class MyUploader < CarrierWave::Uploader::Base
+        #
+        #       version :thumb do
+        #         process :scale => [200, 200]
+        #       end
+        #
+        #       version :preview, :if => :image? do
+        #         process :scale => [200, 200]
+        #       end
+        #
+        #     end
+        #
+        def version(name, options = {}, &block)
           name = name.to_sym
           unless versions[name]
-            versions[name] = Class.new(self)
-            versions[name].version_names.push(*version_names)
-            versions[name].version_names.push(name)
+            uploader = Class.new(self)
+            uploader.versions = {}
+
+            # Define the enable_processing method for versions so they get the
+            # value from the parent class unless explicitly overwritten
+            uploader.class_eval <<-RUBY, __FILE__, __LINE__ + 1
+              def self.enable_processing(value=nil)
+                self.enable_processing = value if value
+                if !@enable_processing.nil?
+                  @enable_processing
+                else
+                  superclass.enable_processing
+                end
+              end
+            RUBY
+
+            # Add the current version hash to class attribute :versions
+            current_version = {}
+            current_version[name] = {
+              :uploader => uploader,
+              :options  => options
+            }
+            self.versions = versions.merge(current_version)
+
+            versions[name][:uploader].version_names += [name]
+
             class_eval <<-RUBY
               def #{name}
                 versions[:#{name}]
               end
             RUBY
+            # as the processors get the output from the previous processors as their
+            # input we must not stack the processors here
+            versions[name][:uploader].processors = versions[name][:uploader].processors.dup
+            versions[name][:uploader].processors.clear
           end
-          versions[name].class_eval(&block) if block
+          versions[name][:uploader].class_eval(&block) if block
           versions[name]
         end
 
